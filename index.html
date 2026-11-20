@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage Shift</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1b2135; --panel:#252d47; --line:#38425f; --chalk:#eeeae0; --muted:#a9b0c6; --gold:#f2b134;
+  --font:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--ink);color:var(--chalk);font-family:var(--font);line-height:1.45;min-height:100vh}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.app{max-width:1100px;margin:0 auto;padding:20px 16px 40px}
+.wrap{display:block}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.head h1{margin:0;font-size:clamp(1.8rem,5vw,3.2rem);font-weight:800;letter-spacing:-.02em;line-height:1.05}
+.head .count{color:var(--muted);font-size:1rem;white-space:nowrap}
+.site{font-size:.9rem;color:var(--muted);margin:0 0 6px}
+
+/* stage */
+.stage{position:relative;width:100%;aspect-ratio:16/10;overflow:hidden;border-radius:10px;
+  background:
+   radial-gradient(ellipse at 50% 35%,rgba(255,255,255,.28),transparent 65%),
+   repeating-linear-gradient(90deg,transparent 0 9%,rgba(110,70,35,.22) 9% 9.0909%),
+   linear-gradient(#e1c291,#d2ae78);
+  box-shadow:inset 0 0 60px rgba(70,40,10,.35),0 14px 40px -10px rgba(0,0,0,.6);
+  --d:36px;--move:1.6s}
+.stage::before,.stage::after{content:"";position:absolute;background:#d9472b;opacity:.75;pointer-events:none}
+.stage::before{left:50%;top:calc(50% - 14px);width:3px;height:28px;margin-left:-1.5px}
+.stage::after{top:50%;left:calc(50% - 14px);height:3px;width:28px;margin-top:-1.5px}
+.front{position:absolute;left:0;right:0;bottom:0;height:5%;min-height:18px;background:rgba(40,24,10,.35);
+  color:rgba(255,246,228,.85);font-size:.75rem;display:grid;place-items:center;letter-spacing:.04em;pointer-events:none}
+.d{position:absolute;left:50%;top:112%;width:var(--d);height:var(--d);transform:translate(-50%,-50%);
+  border-radius:50%;background:var(--c,#e4572e);color:#fff;display:grid;place-items:center;
+  font-weight:600;font-size:calc(var(--d)*.42);line-height:1;white-space:nowrap;user-select:none;
+  box-shadow:0 2px 0 rgba(0,0,0,.25),0 8px 10px -3px rgba(0,0,0,.4);
+  text-shadow:0 1px 2px rgba(0,0,0,.5);
+  transition:left var(--move) cubic-bezier(.55,0,.25,1),top var(--move) cubic-bezier(.55,0,.25,1)}
+.d.pill{width:auto;min-width:var(--d);padding:0 .7em;border-radius:999px;font-size:calc(var(--d)*.38);height:calc(var(--d)*.78)}
+.d.emoji{background:none;box-shadow:none;text-shadow:none;font-size:calc(var(--d)*.9);filter:drop-shadow(0 5px 3px rgba(0,0,0,.35))}
+.bar{height:4px;background:var(--line);border-radius:2px;margin-top:10px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--gold)}
+
+/* controls */
+.transport{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px}
+.btn{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 16px;cursor:pointer;font-weight:600}
+.btn:hover{border-color:var(--muted)}
+.btn.main{background:var(--gold);color:#241a05;border-color:var(--gold);min-width:92px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{background:none;border:0;padding:8px 14px;cursor:pointer;font-weight:600;color:var(--muted)}
+.seg button[aria-checked="true"]{background:var(--chalk);color:#1b2135}
+.spacer{flex:1}
+select{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 10px;max-width:100%}
+.panel{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px}
+.field h2{font-size:1rem;margin:0 0 8px;font-weight:600}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+input[type=range]{flex:1;min-width:120px;accent-color:var(--gold)}
+input[type=number]{width:70px;background:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px}
+textarea{width:100%;min-height:110px;background:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px;resize:vertical}
+input[type=color]{width:44px;height:36px;border:1px solid var(--line);border-radius:8px;background:var(--ink);padding:2px;cursor:pointer}
+.emojis{display:flex;gap:6px;flex-wrap:wrap}
+.emojis button{font-size:1.4rem;background:var(--ink);border:2px solid transparent;border-radius:8px;padding:4px 8px;cursor:pointer}
+.emojis button[aria-pressed="true"]{border-color:var(--gold)}
+.chip{display:inline-flex;align-items:center;gap:8px}
+.sw{width:54px;height:14px;border-radius:7px;display:inline-block}
+.seg.pal button{display:flex;align-items:center;gap:8px}
+.hint{color:var(--muted);font-size:.85rem;margin:6px 0 0}
+[hidden]{display:none!important}
+
+/* guide dialog, descriptions, picker */
+.fdesc{margin:6px 0 0;color:var(--muted);font-size:1rem;max-width:60ch}
+dialog{background:var(--panel);color:var(--chalk);border:1px solid var(--line);border-radius:14px;padding:0;width:min(92vw,580px);max-height:90vh;overflow:auto}
+dialog::backdrop{background:rgba(8,10,20,.72)}
+.gin{padding:24px}
+.gin h2{margin:0 0 6px;font-size:1.8rem;font-weight:800;letter-spacing:-.02em}
+.gin p{margin:0 0 14px;color:var(--muted)}
+.gin ol{margin:0 0 18px;padding-left:1.3em}
+.gin li{margin-bottom:9px}
+.gin li b{font-weight:600;color:var(--chalk)}
+.picker{display:block}
+.picker h2{font-size:1.1rem;margin:0 0 4px;font-weight:600}
+.ptools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0 14px}
+.ptools .btn{padding:7px 12px;font-size:.9rem}
+#pcount{color:var(--gold);font-weight:600}
+.plist{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:4px 14px}
+.item{display:flex;gap:9px;align-items:center;padding:6px 8px;border-radius:8px;cursor:pointer}
+.item:hover{background:rgba(255,255,255,.06)}
+.item input{width:18px;height:18px;accent-color:var(--gold);flex:none}
+#picker{width:min(94vw,700px)}
+.plist{max-height:46vh;overflow:auto;margin-top:2px}
+#psearch{width:100%;background:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.about{color:var(--muted);max-width:70ch;margin:22px auto 0;text-align:center}
+
+/* loading screen */
+#loader{position:fixed;inset:0;z-index:100;background:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:20px;transition:opacity .6s ease,visibility .6s}
+#loader.done{opacity:0;visibility:hidden}
+#loader h2{margin:18px 0 0;font-size:clamp(2.4rem,9vw,4.5rem);font-weight:800;letter-spacing:-.03em;line-height:1}
+#loader p{margin:0;color:var(--muted);font-size:1rem}
+.ld{position:relative;width:160px;height:140px}
+.ld i{position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:var(--c);
+  box-shadow:0 4px 8px -2px rgba(0,0,0,.5);animation:shift 1.8s cubic-bezier(.55,0,.25,1) infinite alternate}
+@keyframes shift{from{transform:translate(var(--ax),var(--ay))}to{transform:translate(var(--bx),var(--by))}}
+.lbar{width:180px;height:4px;background:var(--line);border-radius:2px;margin-top:14px;overflow:hidden}
+.lbar i{display:block;height:100%;width:0;background:var(--gold);animation:fill 2.2s linear forwards}
+@keyframes fill{to{width:100%}}
+.credit{text-align:center;color:var(--muted);font-size:.9rem;margin:26px 0 0}
+@media (prefers-reduced-motion:reduce){.ld i{animation:none;transform:translate(var(--bx),var(--by))}}
+
+/* fullscreen */
+.wrap:fullscreen{background:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px}
+.wrap:fullscreen .stage{width:min(96vw,calc((100vh - 130px)*1.6))}
+.wrap:fullscreen .bar{width:min(96vw,calc((100vh - 130px)*1.6))}
+.wrap:fullscreen .head{width:min(96vw,calc((100vh - 130px)*1.6))}
+
+@media (prefers-reduced-motion:reduce){.stage{--move:.3s!important}}
+@media (max-width:560px){.btn{padding:9px 12px}.seg button{padding:8px 10px}}
+</style>
+</head>
+<body>
+<div id="loader" role="status" aria-live="polite">
+  <div class="ld"><i style="--ax:-77px;--ay:0px;--bx:58px;--by:0px;--c:hsl(0 72% 55%)"></i><i style="--ax:-55px;--ay:0px;--bx:41px;--by:41px;--c:hsl(45 72% 55%)"></i><i style="--ax:-33px;--ay:0px;--bx:0px;--by:58px;--c:hsl(90 72% 55%)"></i><i style="--ax:-11px;--ay:0px;--bx:-41px;--by:41px;--c:hsl(135 72% 55%)"></i><i style="--ax:11px;--ay:0px;--bx:-58px;--by:0px;--c:hsl(180 72% 55%)"></i><i style="--ax:33px;--ay:0px;--bx:-41px;--by:-41px;--c:hsl(225 72% 55%)"></i><i style="--ax:55px;--ay:0px;--bx:0px;--by:-58px;--c:hsl(270 72% 55%)"></i><i style="--ax:77px;--ay:0px;--bx:41px;--by:-41px;--c:hsl(315 72% 55%)"></i></div>
+  <h2>Stage Shift</h2>
+  <p>Created by Mhyco Gabrielle Faulve</p>
+  <div class="lbar"><i></i></div>
+</div>
+<div class="app">
+  <div class="wrap" id="wrap">
+    <p class="site">Stage Shift</p>
+    <div class="head">
+      <div>
+        <h1 id="fname" aria-live="polite">Straight Line</h1>
+        <p class="fdesc" id="fdesc"></p>
+      </div>
+      <div class="count" id="fcount">Formation 1 of 50</div>
+    </div>
+    <div class="stage" id="stage"><div class="front">Audience</div></div>
+    <div class="bar" aria-hidden="true"><i id="bar"></i></div>
+  </div>
+
+  <div class="transport">
+    <button class="btn" id="prev" aria-label="Previous formation">Prev</button>
+    <button class="btn main" id="play" aria-label="Pause">Pause</button>
+    <button class="btn" id="next" aria-label="Next formation">Next</button>
+    <div class="seg" id="timing" role="radiogroup" aria-label="Seconds per formation">
+      <button role="radio" data-v="3000" aria-checked="false">3s</button>
+      <button role="radio" data-v="5000" aria-checked="true">5s</button>
+      <button role="radio" data-v="8000" aria-checked="false">8s</button>
+    </div>
+    <span class="spacer"></span>
+    <select id="jump" aria-label="Jump to formation"></select>
+    <button class="btn" id="choose">Choose formations (50 of 50)</button>
+    <button class="btn" id="help">How to use</button>
+    <button class="btn" id="full">Full screen</button>
+  </div>
+
+  <div class="panel">
+    <div class="field">
+      <h2>How many dancers?</h2>
+      <div class="row">
+        <input type="range" id="nrange" min="1" max="50" value="12" aria-label="Number of dancers">
+        <input type="number" id="nnum" min="1" max="50" value="12" aria-label="Number of dancers">
+      </div>
+      <p class="hint">Pick 1 to 50. Each number gets its own 50 formations.</p>
+    </div>
+
+    <div class="field">
+      <h2>How do dancers look?</h2>
+      <div class="seg" id="look" role="radiogroup" aria-label="Dancer look" style="flex-wrap:wrap">
+        <button role="radio" data-v="dot" aria-checked="true">Dot</button>
+        <button role="radio" data-v="number" aria-checked="false">Number</button>
+        <button role="radio" data-v="emoji" aria-checked="false">Emoji</button>
+        <button role="radio" data-v="initial" aria-checked="false">Initial</button>
+        <button role="radio" data-v="name" aria-checked="false">Name</button>
+      </div>
+      <div class="emojis" id="emojis" style="margin-top:10px" hidden></div>
+    </div>
+
+    <div class="field" id="colorField">
+      <h2>Colors</h2>
+      <div class="seg pal" id="pal" role="radiogroup" aria-label="Color palette" style="flex-wrap:wrap">
+        <button role="radio" data-v="rainbow" aria-checked="true"><span class="sw" style="background:linear-gradient(90deg,#e5484d,#f2b134,#46a758,#3e63dd,#8e4ec6)"></span>Rainbow</button>
+        <button role="radio" data-v="sunset" aria-checked="false"><span class="sw" style="background:linear-gradient(90deg,#ff5e5b,#ffb400)"></span>Sunset</button>
+        <button role="radio" data-v="ocean" aria-checked="false"><span class="sw" style="background:linear-gradient(90deg,#1b6ca8,#2ec4b6)"></span>Ocean</button>
+        <button role="radio" data-v="single" aria-checked="false">One color</button>
+      </div>
+      <div class="row" id="singleRow" style="margin-top:10px" hidden>
+        <input type="color" id="single" value="#e4572e" aria-label="Dancer color">
+        <span class="hint" style="margin:0">All dancers use this color.</span>
+      </div>
+    </div>
+
+    <div class="field" id="namesField" hidden>
+      <h2>Dancer names</h2>
+      <textarea id="names" placeholder="One name per line, first line is dancer 1" aria-label="Dancer names"></textarea>
+      <p class="hint">Empty lines fall back to D1, D2 and so on.</p>
+    </div>
+  </div>
+  <p class="about">Stage Shift is a free formation planner for dance groups. Pick how many dancers you have, and it shows 50 ready-made formations that change on their own, so you can plan transitions before you rehearse.</p>
+  <p class="credit">Stage Shift, created by Mhyco Gabrielle Faulve</p>
+</div>
+
+<dialog id="picker" aria-labelledby="ptitle">
+  <div class="gin">
+    <h2 id="ptitle">Choose formations</h2>
+    <p>Only the ticked formations will play. If nothing is ticked, all 50 will play.</p>
+    <input type="search" id="psearch" placeholder="Search formations, e.g. circle" aria-label="Search formations" autocomplete="off">
+    <div class="ptools">
+      <button class="btn" id="pall">Select all</button>
+      <button class="btn" id="pnone">Deselect all</button>
+      <span id="pcount">50 of 50 chosen</span>
+    </div>
+    <div class="plist" id="plist"></div>
+    <p class="hint" id="pempty" hidden>No formation matches your search.</p>
+    <div style="margin-top:18px"><button class="btn main" id="pdone">Done</button></div>
+  </div>
+</dialog>
+<dialog id="guide" aria-labelledby="gtitle">
+  <div class="gin">
+    <h2 id="gtitle">How to use Stage Shift</h2>
+    <p>Stage Shift is a formation planner for dance groups. It shows your dancers on a floor and moves them through 50 formations.</p>
+    <ol>
+      <li><b>Set your dancers.</b> Use the slider under the stage to pick 1 to 50 dancers.</li>
+      <li><b>Pick a look.</b> Choose Dot, Number, Emoji, Initial or Name, then a color palette. For names, type one per line.</li>
+      <li><b>Watch it play.</b> The formation changes by itself. Choose 3s, 5s or 8s for the time between moves.</li>
+      <li><b>Take control.</b> Use Prev, Next or Pause, or jump to a formation from the menu. On a keyboard, use Space and the left and right arrow keys.</li>
+      <li><b>Choose your formations.</b> Press "Choose formations", tick only the ones you want, then press Done. Only those will play.</li>
+      <li><b>Rehearse big.</b> Press Full screen to show the stage on a TV or projector.</li>
+    </ol>
+    <button class="btn main" id="gclose">Got it</button>
+  </div>
+</dialog>
+<script>
+/* ---------- geometry helpers (stage is 0-100 in x and y, aspect 16:10) ---------- */
+const AR = 0.625;                       // keeps circles round on a 16:10 stage
+const lerp = (a,b,t) => a+(b-a)*t;
+const M = (u,v) => [50+u*AR, 50+v];     // centered "round" units
+const TAU = Math.PI*2;
+
+function distribute(n,w){
+  const T=w.reduce((a,b)=>a+b,0), raw=w.map(x=>n*x/T), c=raw.map(Math.floor);
+  const rem=n-c.reduce((a,b)=>a+b,0);
+  raw.map((r,i)=>[r-Math.floor(r),i]).sort((a,b)=>b[0]-a[0]).slice(0,rem).forEach(([,i])=>c[i]++);
+  return c;
+}
+function densePoly(v,closed){
+  const o=[], m=closed?v.length:v.length-1;
+  for(let i=0;i<m;i++){const a=v[i],b=v[(i+1)%v.length];
+    for(let s=0;s<40;s++)o.push([lerp(a[0],b[0],s/40),lerp(a[1],b[1],s/40)]);}
+  if(!closed)o.push(v[v.length-1]);
+  return o;
+}
+function denseFn(f){const o=[];for(let i=0;i<=300;i++)o.push(f(i/300));return o;}
+function sample(d,n,closed){
+  if(n<=0)return [];
+  if(closed)d=d.concat([d[0]]);
+  const cum=[0];
+  for(let i=1;i<d.length;i++)cum[i]=cum[i-1]+Math.hypot(d[i][0]-d[i-1][0],d[i][1]-d[i-1][1]);
+  const L=cum[cum.length-1];
+  if(!L)return Array.from({length:n},()=>d[0].slice());
+  const out=[];let j=0;
+  for(let i=0;i<n;i++){
+    const tg=closed?L*i/n:(n===1?L/2:L*i/(n-1));
+    while(j<d.length-2&&cum[j+1]<tg)j++;
+    const f=(tg-cum[j])/((cum[j+1]-cum[j])||1);
+    out.push([lerp(d[j][0],d[j+1][0],f),lerp(d[j][1],d[j+1][1],f)]);
+  }
+  return out;
+}
+const LN=(x1,y1,x2,y2)=>c=>sample(densePoly([[x1,y1],[x2,y2]],false),c,false);
+const PL=(v,closed=false)=>c=>sample(densePoly(v,closed),c,closed);
+const CV=(f,closed=false)=>c=>sample(denseFn(f),c,closed);
+const circ=(cx,cy,r)=>t=>{const a=t*TAU-Math.PI/2;return [cx+r*AR*Math.cos(a),cy+r*Math.sin(a)];};
+const vogel=(cx,cy,R)=>c=>Array.from({length:c},(_,i)=>{
+  const r=R*Math.sqrt((i+.5)/c),a=i*2.39996;return [cx+r*AR*Math.cos(a),cy+r*Math.sin(a)];});
+function multi(n,parts,w){
+  const cnt=distribute(n,w||parts.map(()=>1));
+  return parts.flatMap((p,i)=>p(cnt[i]));
+}
+function rowsLayout(counts,o={}){
+  const {x0=10,x1=90,y0=20,y1=80,stagger=false,cap=20}=o;
+  counts=counts.filter(c=>c>0);
+  const R=counts.length, mx=Math.max(...counts);
+  const step=mx>1?Math.min(cap,(x1-x0)/(mx-1)):0, out=[];
+  counts.forEach((c,i)=>{
+    const y=R===1?(y0+y1)/2:lerp(y0,y1,i/(R-1));
+    const w=step*(c-1), sh=stagger?(i%2?step/4:-step/4):0;
+    for(let j=0;j<c;j++)out.push([50-w/2+sh+j*step,y]);
+  });
+  return out;
+}
+const rowsF=(k,o)=>n=>rowsLayout(distribute(n,Array(k).fill(1)),o);
+function bundle(x1,y1,x2,y2,per,gap){
+  return n=>{
+    const k=Math.ceil(n/per), cnt=distribute(n,Array(k).fill(1));
+    const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy),px=-dy/len,py=dx/len;
+    return cnt.flatMap((c,i)=>{const o=(i-(k-1)/2)*gap;
+      return LN(x1+px*o,y1+py*o,x2+px*o,y2+py*o)(c);});
+  };
+}
+function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const shape=(pts,closed=true)=>PL(pts.map(p=>M(p[0],p[1])),closed);
+
+/* ---------- the 50 formations (each works for any dancer count) ---------- */
+const F=[];
+const add=(name,fn)=>F.push({name,fn});
+
+add("Straight Line",bundle(8,50,92,50,26,7));
+add("Two Rows",rowsF(2,{y0:38,y1:62}));
+add("Three Rows",rowsF(3,{y0:28,y1:72}));
+add("Four Rows",rowsF(4,{y0:22,y1:78}));
+add("Block Grid",n=>{
+  const cols=Math.ceil(Math.sqrt(n*1.7)),rows=Math.ceil(n/cols);
+  return rowsLayout(distribute(n,Array(rows).fill(1)),{x0:20,x1:80,y0:22,y1:78,cap:13});
+});
+add("Staggered Rows",rowsF(3,{y0:26,y1:74,stagger:true}));
+add("Center Column",bundle(50,10,50,86,14,8));
+add("Diagonal Down",bundle(10,12,90,88,18,7));
+add("Diagonal Up",bundle(10,88,90,12,18,7));
+add("Big Circle",CV(circ(50,50,38),true));
+add("Two Circles",n=>multi(n,[CV(circ(28,50,22),true),CV(circ(72,50,22),true)]));
+add("Concentric Rings",n=>{
+  const k=Math.max(1,Math.round(Math.sqrt(n/2.6))),r=Array.from({length:k},(_,i)=>38*(i+1)/k);
+  const cnt=distribute(n,r);
+  return r.flatMap((rad,i)=>CV(circ(50,50,rad),true)(cnt[i]));
+});
+add("Ring and Center",n=>{
+  const m=Math.max(1,Math.round(n*.22)),ring=n-m;
+  const center=m===1?[[50,50]]:CV(circ(50,50,9),true)(m);
+  return CV(circ(50,50,38),true)(ring).concat(center);
+});
+add("Wide Oval",CV(t=>[50+42*Math.cos(t*TAU),50+20*Math.sin(t*TAU)],true));
+add("Tall Oval",CV(t=>[50+14*Math.cos(t*TAU),50+38*Math.sin(t*TAU)],true));
+add("V Shape",PL([[10,15],[50,85],[90,15]]));
+add("Arrowhead",PL([[10,85],[50,15],[90,85]]));
+add("Triangle",shape([[0,-38],[46,34],[-46,34]]));
+add("Pyramid",n=>{
+  const r=Math.ceil((Math.sqrt(8*n+1)-1)/2);
+  return rowsLayout(distribute(n,Array.from({length:r},(_,i)=>i+1)),{y0:14,y1:86});
+});
+add("Inverted Pyramid",n=>{
+  const r=Math.ceil((Math.sqrt(8*n+1)-1)/2);
+  return rowsLayout(distribute(n,Array.from({length:r},(_,i)=>r-i)),{y0:14,y1:86});
+});
+add("Diamond",PL([[50,10],[82,50],[50,90],[18,50]],true));
+add("Square",shape([[-36,-36],[36,-36],[36,36],[-36,36]]));
+add("Plus Sign",n=>multi(n,[LN(10,50,44,50),LN(56,50,90,50),LN(50,12,50,38),LN(50,62,50,88)],[34,34,26,26]));
+add("X Shape",n=>multi(n,[LN(12,14,42,42),LN(88,14,58,42),LN(12,86,42,58),LN(88,86,58,58)]));
+add("Star",n=>{
+  const v=[];for(let i=0;i<10;i++){const r=i%2?16:40,a=-Math.PI/2+i*Math.PI/5;v.push([r*Math.cos(a),r*Math.sin(a)]);}
+  return shape(v)(n);
+});
+add("Heart",CV(t=>{const a=t*TAU,
+  u=16*Math.pow(Math.sin(a),3)*2.3,
+  v=-(13*Math.cos(a)-5*Math.cos(2*a)-2*Math.cos(3*a)-Math.cos(4*a))*2.3-6;
+  return M(u,v);},true));
+add("Spiral",CV(t=>{const a=t*2.6*TAU,r=3+37*t;return M(r*Math.cos(a),r*Math.sin(a));}));
+add("Double Spiral",n=>multi(n,[0,1].map(k=>CV(t=>{const a=k*Math.PI+t*1.3*TAU,r=4+34*t;return M(r*Math.cos(a),r*Math.sin(a));}))));
+add("Sine Wave",CV(t=>[8+84*t,50+22*Math.sin(t*TAU*2)]));
+add("Double Wave",n=>multi(n,[CV(t=>[8+84*t,35+11*Math.sin(t*TAU*2)]),CV(t=>[8+84*t,65-11*Math.sin(t*TAU*2)])]));
+add("Zigzag",PL([[8,22],[28,78],[50,22],[72,78],[92,22]]));
+add("Smile",CV(t=>[10+80*t,25+45*Math.sin(Math.PI*t)]));
+add("Frown",CV(t=>[10+80*t,75-45*Math.sin(Math.PI*t)]));
+add("W Shape",PL([[10,20],[30,80],[50,35],[70,80],[90,20]]));
+add("M Shape",PL([[10,80],[30,20],[50,65],[70,20],[90,80]]));
+add("Infinity",CV(t=>{const a=t*TAU,s=1+Math.sin(a)**2;return M(55*Math.cos(a)/s,55*Math.sin(a)*Math.cos(a)/s);},true));
+add("Pinwheel",n=>multi(n,[0,1,2,3].map(k=>CV(t=>{const a=k*Math.PI/2+t*1.1,r=6+34*t;return M(r*Math.cos(a),r*Math.sin(a));}))));
+add("Flower",CV(t=>{const a=t*Math.PI,r=38*Math.cos(3*a);return M(r*Math.cos(a),r*Math.sin(a));},true));
+add("Hexagon",n=>{
+  const v=[];for(let i=0;i<6;i++){const a=i*Math.PI/3;v.push([40*Math.cos(a),40*Math.sin(a)]);}
+  return shape(v)(n);
+});
+add("Two Walls",n=>multi(n,[LN(26,12,26,88),LN(74,12,74,88)]));
+add("Four Corners",n=>multi(n,[vogel(22,26,13),vogel(78,26,13),vogel(22,74,13),vogel(78,74,13)]));
+add("Three Clusters",n=>multi(n,[vogel(50,26,15),vogel(24,72,15),vogel(76,72,15)]));
+add("Arrow Up",n=>multi(n,[LN(50,88,50,40),PL([[26,40],[50,14],[74,40]])],[48,71]));
+add("Staircase",PL([[8,88],[24,88],[24,68],[40,68],[40,48],[56,48],[56,28],[72,28],[72,12],[92,12]]));
+add("Corner L",PL([[12,14],[12,86],[88,86]]));
+add("U Shape",PL([[18,14],[18,86],[82,86],[82,14]]));
+add("Checkerboard",n=>{
+  let s=2;while(Math.ceil(s*s/2)<n)s++;
+  const cells=[];
+  for(let r=0;r<s;r++)for(let c=0;c<s;c++)if((r+c)%2===0)cells.push([lerp(20,80,c/(s-1)),lerp(18,82,r/(s-1))]);
+  return Array.from({length:n},(_,i)=>cells[n===1?Math.floor(cells.length/2):Math.round(i*(cells.length-1)/(n-1))]);
+});
+add("Scatter",n=>{
+  const rnd=mulberry(42+n),cols=Math.ceil(Math.sqrt(n*1.6)),rows=Math.ceil(n/cols),cells=[];
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)cells.push([r,c]);
+  for(let i=cells.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[cells[i],cells[j]]=[cells[j],cells[i]];}
+  return cells.slice(0,n).map(([r,c])=>[
+    lerp(10,90,(c+.5+(rnd()-.5)*.7)/cols),lerp(12,88,(r+.5+(rnd()-.5)*.7)/rows)]);
+});
+add("Galaxy",n=>multi(n,[0,1,2].map(k=>CV(t=>{const a=k*TAU/3+t*1.7*Math.PI,r=4+36*t;return M(r*Math.cos(a),r*Math.sin(a));}))));
+add("Sunflower",vogel(50,50,40));
+
+/* short description for each formation */
+const DESC={
+"Straight Line":"Everyone side by side in one line across the stage. Big groups wrap into extra lines.",
+"Two Rows":"Two even rows, one behind the other, centered on the floor.",
+"Three Rows":"Three even rows, a classic layout for group choreography.",
+"Four Rows":"Four tidy rows that fill the depth of the stage.",
+"Block Grid":"A neat block of rows and columns in the middle of the stage.",
+"Staggered Rows":"Rows where every second row is shifted, so no one hides behind another dancer.",
+"Center Column":"A line from back to front down the middle. Large groups form side-by-side columns.",
+"Diagonal Down":"A diagonal from the back left to the front right.",
+"Diagonal Up":"A diagonal from the front left to the back right.",
+"Big Circle":"One large circle with equal space between dancers.",
+"Two Circles":"Two circles side by side, left and right.",
+"Concentric Rings":"Circles inside circles, like a target. More dancers make more rings.",
+"Ring and Center":"A big outer ring with a small group gathered in the middle.",
+"Wide Oval":"A stretched oval that spreads across the width of the stage.",
+"Tall Oval":"A narrow oval that runs from the back of the stage to the front.",
+"V Shape":"A V pointing toward the audience.",
+"Arrowhead":"A V pointing to the back, with the tip at the rear.",
+"Triangle":"The outline of a triangle with the point at the back.",
+"Pyramid":"A filled triangle, one dancer at the back and the rows growing wider to the front.",
+"Inverted Pyramid":"A filled triangle with the wide row at the back and a single dancer at the front.",
+"Diamond":"A diamond outline with points at the four sides of the stage.",
+"Square":"A square outline in the center of the stage.",
+"Plus Sign":"Four arms reaching out from the center with a gap in the middle.",
+"X Shape":"Four diagonal arms from the corners toward the center.",
+"Star":"A five-point star traced around its outline.",
+"Heart":"A heart shape made by the dancers, good for a finale.",
+"Spiral":"A single arm curling out from the center.",
+"Double Spiral":"Two spiral arms winding out from the center together.",
+"Sine Wave":"A smooth wave moving across the stage.",
+"Double Wave":"Two waves that mirror each other, one above the other.",
+"Zigzag":"A sharp zigzag line from one side to the other.",
+"Smile":"A curved line that dips in the middle like a smile.",
+"Frown":"A curved line that arches up in the middle.",
+"W Shape":"The letter W spread across the stage.",
+"M Shape":"The letter M spread across the stage.",
+"Infinity":"A figure eight on its side, the infinity loop.",
+"Pinwheel":"Four curved arms turning around the center like a windmill.",
+"Flower":"A three-petal flower drawn by the dancers.",
+"Hexagon":"A six-sided shape in the middle of the stage.",
+"Two Walls":"Two straight lines facing each other, left and right.",
+"Four Corners":"Four small groups, one in each corner.",
+"Three Clusters":"Three groups placed in a triangle: one at the back and two at the front.",
+"Arrow Up":"An arrow pointing to the back of the stage.",
+"Staircase":"Steps climbing from the front left to the back right.",
+"Corner L":"An L shape along the left side and the front of the stage.",
+"U Shape":"A U shape open toward the back of the stage.",
+"Checkerboard":"Dancers spaced like the dark squares of a checkerboard.",
+"Scatter":"A loose, natural spread over the whole stage with no pattern.",
+"Galaxy":"Three spiral arms turning around the center.",
+"Sunflower":"A packed round cluster in the middle, like the seeds of a sunflower."
+};
+
+/* ---------- app ---------- */
+const $=id=>document.getElementById(id);
+const stage=$("stage");
+const S={n:12,idx:0,playing:true,ms:5000,look:"dot",emoji:"💃",pal:"rainbow",color:"#e4572e",names:[],sel:new Set(F.map((_,i)=>i))};
+let dancers=[],pos=[],timer=null;
+
+function hexLerp(a,b,t){
+  const p=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+  const A=p(a),B=p(b);return "rgb("+A.map((v,i)=>Math.round(lerp(v,B[i],t))).join(",")+")";
+}
+function colorFor(i,n){
+  const t=n>1?i/(n-1):0;
+  if(S.pal==="rainbow")return `hsl(${Math.round(i*360/n)} 72% 50%)`;
+  if(S.pal==="sunset")return hexLerp("#ff5e5b","#ffb400",t);
+  if(S.pal==="ocean")return hexLerp("#1b6ca8","#2ec4b6",t);
+  return S.color;
+}
+function nameOf(i){return (S.names[i]||"").trim()||("D"+(i+1));}
+
+function paintDancers(){
+  dancers.forEach((el,i)=>{
+    el.className="d"+(S.look==="name"?" pill":"")+(S.look==="emoji"?" emoji":"");
+    el.style.setProperty("--c",colorFor(i,S.n));
+    el.textContent=S.look==="number"?i+1:S.look==="emoji"?S.emoji:S.look==="initial"?nameOf(i).charAt(0).toUpperCase():S.look==="name"?nameOf(i):"";
+    el.title=nameOf(i);
+  });
+}
+function sizeDots(){
+  const r=stage.getBoundingClientRect();
+  let d=Math.sqrt(r.width*r.height/S.n)*.26;
+  d=Math.max(18,Math.min(52,d));
+  stage.style.setProperty("--d",d+"px");
+}
+function build(){
+  dancers.forEach(e=>e.remove());dancers=[];pos=[];
+  for(let i=0;i<S.n;i++){const e=document.createElement("div");stage.appendChild(e);dancers.push(e);pos.push([50,112]);}
+  sizeDots();paintDancers();
+  void stage.offsetWidth;
+  go(S.idx);
+}
+
+/* match dancers to the next spots so they travel the shortest way */
+function assign(prev,pts){
+  const n=prev.length,d=(a,b)=>Math.hypot((a[0]-b[0])*1.6,a[1]-b[1]);
+  const perm=Array(n).fill(-1),used=Array(n).fill(false);
+  for(let i=0;i<n;i++){let b=-1,bd=1e9;
+    for(let j=0;j<n;j++)if(!used[j]){const v=d(prev[i],pts[j]);if(v<bd){bd=v;b=j;}}
+    perm[i]=b;used[b]=true;}
+  for(let pass=0;pass<6;pass++){let ch=false;
+    for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){
+      if(d(prev[i],pts[perm[j]])+d(prev[j],pts[perm[i]])<d(prev[i],pts[perm[i]])+d(prev[j],pts[perm[j]])-1e-9){
+        [perm[i],perm[j]]=[perm[j],perm[i]];ch=true;}}
+    if(!ch)break;}
+  return perm;
+}
+function go(idx){
+  S.idx=((idx%F.length)+F.length)%F.length;
+  let pts=F[S.idx].fn(S.n);
+  while(pts.length<S.n)pts.push([50,50]);
+  const perm=assign(pos,pts);
+  dancers.forEach((el,i)=>{const p=pts[perm[i]];pos[i]=p;el.style.left=p[0]+"%";el.style.top=p[1]+"%";});
+  $("fname").textContent=F[S.idx].name;
+  $("fdesc").textContent=DESC[F[S.idx].name]||"";
+  updateCount();
+  $("jump").value=S.idx;
+  stage.style.setProperty("--move",Math.min(1.8,S.ms/2500)+"s");
+  schedule();
+}
+function bar(){
+  const b=$("bar");b.style.transition="none";b.style.width="0%";void b.offsetWidth;
+  if(S.playing){b.style.transition=`width ${S.ms}ms linear`;b.style.width="100%";}
+}
+function schedule(){
+  clearTimeout(timer);
+  if(S.playing)timer=setTimeout(()=>go(nextSel(1)),S.ms);
+  bar();
+}
+function setPlaying(p){
+  S.playing=p;$("play").textContent=p?"Pause":"Play";$("play").setAttribute("aria-label",p?"Pause":"Play");schedule();
+}
+
+/* ---------- wiring ---------- */
+/* ----- formation selection ----- */
+function order(){const o=[...S.sel].sort((a,b)=>a-b);return o.length?o:F.map((_,i)=>i);}
+function nextSel(dir){
+  const o=order();
+  if(dir>0)return o.find(i=>i>S.idx)??o[0];
+  return [...o].reverse().find(i=>i<S.idx)??o[o.length-1];
+}
+function updateCount(){
+  const o=order(),k=o.indexOf(S.idx);
+  $("fcount").textContent=k>=0?`Formation ${k+1} of ${o.length}`:`Formation ${S.idx+1} (not in your list)`;
+  const chosen=S.sel.size;
+  $("pcount").textContent=`${chosen} of ${F.length} chosen`;
+  $("choose").textContent=`Choose formations (${chosen||F.length} of ${F.length})`;
+}
+function rebuildJump(){
+  const j=$("jump");j.innerHTML="";
+  order().forEach(i=>{const o=document.createElement("option");o.value=i;o.textContent=`${i+1}. ${F[i].name}`;j.appendChild(o);});
+  j.value=S.idx;
+}
+function syncChecks(){[...$("plist").querySelectorAll("input")].forEach((c,i)=>c.checked=S.sel.has(i));}
+function selectionChanged(){rebuildJump();updateCount();}
+F.forEach((f,i)=>{
+  const l=document.createElement("label");l.className="item";l.title=DESC[f.name]||"";
+  const c=document.createElement("input");c.type="checkbox";c.checked=true;
+  c.onchange=()=>{
+    if(c.checked)S.sel.add(i);else S.sel.delete(i);
+    selectionChanged();
+  };
+  const t=document.createElement("span");t.textContent=`${i+1}. ${f.name}`;
+  l.dataset.name=f.name.toLowerCase()+" "+(i+1);l.append(c,t);$("plist").appendChild(l);
+});
+/* Select all / Deselect all act on the formations currently shown (so they work with search) */
+function visibleItems(){return [...$("plist").children].filter(l=>!l.hidden);}
+$("pall").onclick=()=>{visibleItems().forEach(l=>S.sel.add([...$("plist").children].indexOf(l)));syncChecks();selectionChanged();};
+$("pnone").onclick=()=>{visibleItems().forEach(l=>S.sel.delete([...$("plist").children].indexOf(l)));syncChecks();selectionChanged();};
+$("psearch").oninput=e=>{
+  const q=e.target.value.trim().toLowerCase();let shown=0;
+  [...$("plist").children].forEach(l=>{l.hidden=!!q&&!l.dataset.name.includes(q);if(!l.hidden)shown++;});
+  $("pempty").hidden=shown>0;
+};
+const picker=$("picker");
+$("choose").onclick=()=>{$("psearch").value="";$("psearch").dispatchEvent(new Event("input"));picker.showModal();};
+$("pdone").onclick=()=>picker.close();
+picker.addEventListener("click",e=>{if(e.target===picker)picker.close();});
+picker.addEventListener("close",()=>{
+  if(S.sel.size===0){S.sel=new Set(F.map((_,i)=>i));syncChecks();}
+  selectionChanged();
+});
+rebuildJump();
+
+/* ----- how-to dialog ----- */
+const guide=$("guide");
+$("help").onclick=()=>guide.showModal();
+$("gclose").onclick=()=>guide.close();
+guide.addEventListener("click",e=>{if(e.target===guide)guide.close();});
+function firstVisitGuide(){
+  let seen=false;
+  try{seen=localStorage.getItem("stageshift-guide")==="1";}catch(e){}
+  if(!seen){guide.showModal();try{localStorage.setItem("stageshift-guide","1");}catch(e){}}
+}
+$("jump").onchange=e=>go(+e.target.value);
+$("next").onclick=()=>go(nextSel(1));
+$("prev").onclick=()=>go(nextSel(-1));
+$("play").onclick=()=>setPlaying(!S.playing);
+$("full").onclick=()=>{const w=$("wrap");
+  if(document.fullscreenElement)document.exitFullscreen();else if(w.requestFullscreen)w.requestFullscreen();};
+
+function seg(id,cb){
+  const root=$(id);
+  root.addEventListener("click",e=>{
+    const b=e.target.closest("button");if(!b)return;
+    root.querySelectorAll("button").forEach(x=>x.setAttribute("aria-checked",x===b));
+    cb(b.dataset.v);
+  });
+}
+seg("timing",v=>{S.ms=+v;go(S.idx);});
+seg("look",v=>{S.look=v;
+  $("emojis").hidden=v!=="emoji";
+  $("namesField").hidden=!(v==="initial"||v==="name");
+  $("colorField").hidden=v==="emoji";
+  paintDancers();sizeDots();});
+seg("pal",v=>{S.pal=v;$("singleRow").hidden=v!=="single";paintDancers();});
+
+["💃","🕺","⭐","🔥","🦋","🌸","👑","🎭","🪩","🩰"].forEach(em=>{
+  const b=document.createElement("button");b.textContent=em;b.setAttribute("aria-label","Use "+em);
+  b.setAttribute("aria-pressed",em===S.emoji);
+  b.onclick=()=>{S.emoji=em;[...$("emojis").children].forEach(x=>x.setAttribute("aria-pressed",x===b));paintDancers();};
+  $("emojis").appendChild(b);
+});
+$("single").oninput=e=>{S.color=e.target.value;paintDancers();};
+$("names").oninput=e=>{S.names=e.target.value.split("\n");paintDancers();};
+
+function setCount(v){
+  v=Math.max(1,Math.min(50,Math.round(+v)||1));
+  $("nrange").value=v;$("nnum").value=v;
+  if(v!==S.n){S.n=v;build();}
+}
+$("nrange").oninput=e=>setCount(e.target.value);
+$("nnum").onchange=e=>setCount(e.target.value);
+
+document.addEventListener("keydown",e=>{
+  if(e.target!==document.body)return;
+  if(e.key==="ArrowRight")go(nextSel(1));
+  else if(e.key==="ArrowLeft")go(nextSel(-1));
+  else if(e.key===" "){e.preventDefault();setPlaying(!S.playing);}
+});
+new ResizeObserver(sizeDots).observe(stage);
+
+/* loading screen: show for at least 2.2s, then start the show */
+let started=false;
+function start(){
+  if(started)return;started=true;
+  $("loader").classList.add("done");
+  build();
+  setTimeout(()=>$("loader").remove(),800);
+  setTimeout(firstVisitGuide,900);
+}
+const minWait=new Promise(r=>setTimeout(r,2200));
+const loaded=new Promise(r=>{if(document.readyState==="complete")r();else window.addEventListener("load",r);});
+Promise.all([minWait,loaded]).then(start);
+setTimeout(start,5000);   // safety net if a font or script stalls
+</script>
+</body>
+</html>
